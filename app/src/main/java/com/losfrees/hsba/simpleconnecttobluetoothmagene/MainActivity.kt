@@ -3,7 +3,6 @@ package com.losfrees.hsba.simpleconnecttobluetoothmagene
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothGatt
-import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -20,30 +19,18 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams
 import android.widget.Button
+import android.widget.ListView
+import android.widget.ProgressBar
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.health.services.client.ExerciseClient
-import androidx.health.services.client.ExerciseUpdateCallback
-import androidx.health.services.client.HealthServices
-import androidx.health.services.client.MeasureCallback
-import androidx.health.services.client.MeasureClient
-import androidx.health.services.client.data.Availability
-import androidx.health.services.client.data.DataPointContainer
-import androidx.health.services.client.data.DataType
-import androidx.health.services.client.data.DataTypeAvailability
-import androidx.health.services.client.data.DeltaDataType
-import androidx.health.services.client.data.ExerciseLapSummary
-import androidx.health.services.client.data.ExerciseUpdate
-import androidx.health.services.client.data.LocationAvailability
-import androidx.health.services.client.data.MeasureCapabilities
-import androidx.health.services.client.getCapabilities
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import com.losfrees.hsba.simpleconnecttobluetoothmagene.co
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -56,6 +43,10 @@ class MainActivity : AppCompatActivity() {
      var addressMy : String = ""
     var connected  = false
     private lateinit var buttonExit : Button
+    private lateinit var layoutMain : LinearLayoutCompat
+    private lateinit var progressBar : ProgressBar
+    private lateinit var idListMain : ListView
+    val arrayL = ArrayList<String>()
 
 
     private var bluetoothServiceL : BluettothLeServiceLos? = null
@@ -66,18 +57,18 @@ class MainActivity : AppCompatActivity() {
             service: IBinder
         ) {
 
-                        println(" Connect service 0001 ")
+                    //    println(" Connect service 0001 ")
 
 
             bluetoothServiceL = (service as BluettothLeServiceLos.LocalBinder).getService()
             bluetoothServiceL?.let { bluetooth ->
                 // call functions on service to check connection and connect to devices
                 if (!bluetooth.initialize()) {
-                    println( "Unable to initialize Bluetooth")
+                  //  println( "Unable to initialize Bluetooth")
                     finish()
                 }
 
-                println(" ok initialize and connect ")
+                //println(" ok initialize and connect ")
                 bluetooth.connect(addressMy)
 
 
@@ -86,7 +77,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onServiceDisconnected(componentName: ComponentName) {
 
-            println(" disconnect service 0001 ")
+           // println(" disconnect service 0001 ")
             bluetoothServiceL = null
         }
     }
@@ -98,23 +89,19 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
 
-        // check bluetooth request
-
-//           val gattServiceIntent = Intent(baseContext, BluettothLeServiceLos::class.java)
-//            bindService(gattServiceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
-
-        buttonExit = findViewById<Button?>(R.id.button_exit)
+        buttonExit = findViewById(R.id.button_exit)
+        idListMain = findViewById(R.id.id_list)
 
         buttonExit.setOnClickListener {
             println(" exit all ")
+
+            if(bluetoothServiceL !=null)
               unbindService(serviceConnection)
+
+
+
         }
 
-//        buttonExit = findViewById<Button>(R.id.button_exit).setOnClickListener (
-//
-//            println( " exit in apps ")
-//
-//        )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(
@@ -153,7 +140,12 @@ class MainActivity : AppCompatActivity() {
         }
 
 
+         layoutMain = findViewById(R.id.main)
 
+        progressBar  = ProgressBar(this)
+        progressBar.layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+
+        layoutMain.addView(progressBar)
 
 
     val bluetoothAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)
@@ -182,7 +174,10 @@ class MainActivity : AppCompatActivity() {
             ) {
                 return@postDelayed
             }
+            println(" stop scan ")
             bluetoothLeScanner.stopScan(leScanCallback)
+            seeNormalScreen()
+
         }, SCAN_PERIOD)
         scanning = true
         bluetoothLeScanner.startScan(leScanCallback)
@@ -193,18 +188,50 @@ class MainActivity : AppCompatActivity() {
 }
 
 
+    private fun returAddress(a : String) : String {
+
+        val findA = a.indexOf("%%", 0)
+       return  a.substring(findA +2, a.length)
+    }
+
+    private fun seeNormalScreen(){
+
+        layoutMain.removeView(progressBar)
+        buttonExit.visibility = View.VISIBLE
+
+        val dataset = arrayL
+        val customAdapter = CustomAdapterLO(dataset)
+        idListMain.adapter = customAdapter
+
+        idListMain.visibility = View.VISIBLE
+        idListMain.setOnItemClickListener{list, inaa, df,l  ->
+
+            addressMy = returAddress(arrayL[df])
+
+//            println(" my address ${addressMy}")
+            val gattServiceIntent = Intent(baseContext, BluettothLeServiceLos::class.java)
+            bindService(gattServiceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+    }
+
+
+    }
+
     private val leScanCallback: ScanCallback = object : ScanCallback() {
 
         override fun onScanResult(callbackType: Int, result: ScanResult) {
         super.onScanResult(callbackType, result)
 
-            if(result.device.name == "34224-1"){
-            bluetoothLeScanner.stopScan(this)
-            addressMy = result.device.address
+            println(" my found device is == ${result.device.name}")
 
-                val gattServiceIntent = Intent(baseContext, BluettothLeServiceLos::class.java)
-            bindService(gattServiceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
-        }
+            if(!result.device.name.isNullOrEmpty()){
+
+                val finalString = "${result.device.name}%%${result.device.address}"
+
+                if(!arrayL.contains(finalString))
+                    arrayL.add(finalString)
+            }
+
     }
 }
 
@@ -238,36 +265,6 @@ class MainActivity : AppCompatActivity() {
    private  fun displayAllServices(gattServices: List<BluetoothGattService>? ){
 
        if(gattServices == null) return
-
-
-//
-//       var intS = 0
-//       gattServices.forEach { gattSer ->
-//
-//          // intS++
-//           println(" my ${intS++}")
-//           // my services = 6
-//           // 00001800-0000-1000-8000-00805f9b34fb
-//
-//           println(" my service UUID  == ${gattSer.uuid.toString()}")
-//           println(" Name = ${gattSer.describeContents()}")
-//
-//
-//
-//            gattSer.let { get ->
-//
-//
-//
-//
-//                get.characteristics.forEach {
-//
-//              //   bluetoothServiceL!!.setCharacteristicNotification(it, true)
-//                    println(" my uuid in descp ${it.uuid} ")
-//                    println(" my descp in des ${it.descriptors.size} ")
-//                    println(" my proper in dex ${it.properties} ")
-//                }
-//            }
-//       }
 
          bluetoothServiceL!!.onWriteCharacterAll()
 

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SimpleConnectToBluetoothMagene</string>
+    <string name="exit">EXIT!</string>
 </resources>
